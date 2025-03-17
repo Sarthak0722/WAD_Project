@@ -1,7 +1,17 @@
 import React from 'react';
 import { Box, Typography, Button } from '@mui/material';
+import { useCart } from '../context/CartContext';
+import { useNavigate } from 'react-router-dom';
 
-const ProductCard = ({ title, price, image, onClick }) => {
+const ProductCard = ({ title, price, image }) => {
+  const { addToCart } = useCart();
+  const navigate = useNavigate();
+
+  const handleAddToCart = () => {
+    addToCart({ title, price: parseFloat(price), image });
+    navigate('/cart');
+  };
+
   return (
     <Box
       sx={{
@@ -66,7 +76,7 @@ const ProductCard = ({ title, price, image, onClick }) => {
           width: '100%',
           py: 1
         }}
-        onClick={onClick}
+        onClick={handleAddToCart}
       >
         Add to cart
       </Button>
