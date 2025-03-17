@@ -48,6 +48,11 @@ export const CartProvider = ({ children }) => {
     );
   };
 
+  const clearCart = () => {
+    setCartItems([]);
+    removePromoCode();
+  };
+
   const applyPromoCode = (code) => {
     if (code === 'FLAT10') {
       setPromoCode(code);
@@ -70,7 +75,7 @@ export const CartProvider = ({ children }) => {
     subtotal,
     deliveryCharges,
     discount: discountAmount,
-    grandTotal,
+    total: subtotal + deliveryCharges - discountAmount,
     itemCount: cartItems.reduce((sum, item) => sum + item.quantity, 0)
   };
 
@@ -81,6 +86,7 @@ export const CartProvider = ({ children }) => {
         addToCart,
         removeFromCart,
         updateQuantity,
+        clearCart,
         promoCode,
         applyPromoCode,
         removePromoCode,
@@ -92,3 +98,5 @@ export const CartProvider = ({ children }) => {
     </CartContext.Provider>
   );
 };
+
+export default CartContext;

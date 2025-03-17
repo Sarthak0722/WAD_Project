@@ -101,7 +101,7 @@ const Navbar = () => {
             <Link to="/calendar" style={{ color: 'inherit' }}>
               <CalendarMonthIcon sx={{ cursor: 'pointer' }} />
             </Link>
-            <Link to="/history" style={{ color: 'inherit' }}>
+            <Link to="/order-history" style={{ color: 'inherit' }}>
               <HistoryIcon sx={{ cursor: 'pointer' }} />
             </Link>
             <Box>

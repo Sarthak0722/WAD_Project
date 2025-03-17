@@ -16,6 +16,7 @@ import CloseIcon from '@mui/icons-material/Close';
 import ShoppingBagIcon from '@mui/icons-material/ShoppingBag';
 import Navbar from '../components/Navbar';
 import { useCart } from '../context/CartContext';
+import { useOrders } from '../context/OrderContext';
 import { useNavigate } from 'react-router-dom';
 
 const CartPage = () => {
@@ -27,13 +28,30 @@ const CartPage = () => {
     removePromoCode,
     promoCode,
     cartTotal,
+    clearCart,
   } = useCart();
+  const { addOrder } = useOrders();
   const [promoInput, setPromoInput] = useState('');
   const navigate = useNavigate();
 
   const handlePromoCode = () => {
     applyPromoCode(promoInput);
     setPromoInput('');
+  };
+
+  const handleProceedToPayment = () => {
+    // Create a new order with properly formatted items
+    const formattedItems = cartItems.map(item => ({
+      id: item.id,
+      name: item.title, // Using title as name
+      quantity: item.quantity,
+      price: item.price,
+      image: item.image
+    }));
+    
+    addOrder(formattedItems, cartTotal.total);
+    clearCart();
+    navigate('/order-history');
   };
 
   if (cartItems.length === 0) {
@@ -249,11 +267,11 @@ const CartPage = () => {
             <Typography sx={{ fontFamily: 'cursive' }}>Delivery charges</Typography>
             <Typography sx={{ fontFamily: 'cursive' }}>{cartTotal.deliveryCharges}</Typography>
           </Box>
-          {cartTotal.discount > 0 && (
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <Typography sx={{ fontFamily: 'cursive' }}>
-                  Discount ({promoCode})
+          {promoCode && (
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                <Typography sx={{ fontFamily: 'cursive', mr: 1 }}>
+                  Promo ({promoCode})
                 </Typography>
                 <IconButton
                   size="small"
@@ -263,36 +281,37 @@ const CartPage = () => {
                   <CloseIcon fontSize="small" />
                 </IconButton>
               </Box>
-              <Typography sx={{ fontFamily: 'cursive', color: 'error.main' }}>
-                -{cartTotal.discount.toFixed(1)}
+              <Typography sx={{ fontFamily: 'cursive', color: 'success.main' }}>
+                -{cartTotal.discount}
               </Typography>
             </Box>
           )}
           <Divider sx={{ my: 2 }} />
           <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
             <Typography sx={{ fontFamily: 'cursive', fontWeight: 'bold' }}>
-              Grand total
+              Total
             </Typography>
             <Typography sx={{ fontFamily: 'cursive', fontWeight: 'bold' }}>
-              {cartTotal.grandTotal.toFixed(1)}
+              {cartTotal.total.toFixed(1)}
             </Typography>
           </Box>
           <Button
             fullWidth
+            variant="contained"
+            onClick={handleProceedToPayment}
             sx={{
-              bgcolor: '#90EE90',
+              bgcolor: '#b2ebf2',
               color: 'black',
               py: 1.5,
-              borderRadius: '16px',
+              borderRadius: '25px',
               fontFamily: 'cursive',
               fontSize: '1.1rem',
               '&:hover': {
-                bgcolor: '#98FB98',
+                bgcolor: '#81d4fa',
               },
             }}
-            onClick={() => navigate('/checkout')}
           >
-            Proceed to payment
+            Proceed to Payment
           </Button>
         </Box>
       </Container>
