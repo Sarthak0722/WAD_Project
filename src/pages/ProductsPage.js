@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Box, Container, Typography, InputBase, IconButton } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
+import RestaurantIcon from '@mui/icons-material/Restaurant';
 import Navbar from '../components/Navbar';
 import ProductCard from '../components/ProductCard';
 import { useParams } from 'react-router-dom';
@@ -56,10 +57,10 @@ const ProductsPage = () => {
         {/* Category Title with Icons */}
         <Box sx={{ textAlign: 'center', mb: 4 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2 }}>
-            <img
-              src="/milk-icon.png"
-              alt="Category Icon"
-              style={{ width: '40px', height: '40px' }}
+            <RestaurantIcon 
+              sx={{ 
+                fontSize: 40
+              }} 
             />
             <Typography
               variant="h3"
@@ -71,10 +72,10 @@ const ProductsPage = () => {
             >
               {category}
             </Typography>
-            <img
-              src="/milk-icon.png"
-              alt="Category Icon"
-              style={{ width: '40px', height: '40px' }}
+            <RestaurantIcon 
+              sx={{ 
+                fontSize: 40
+              }} 
             />
           </Box>
         </Box>

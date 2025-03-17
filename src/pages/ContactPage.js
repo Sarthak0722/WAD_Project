@@ -12,6 +12,7 @@ import {
 import PhoneIcon from '@mui/icons-material/Phone';
 import WhatsAppIcon from '@mui/icons-material/WhatsApp';
 import Navbar from '../components/Navbar';
+import bannerImage from '../assets/images/Banner.jpg';
 
 const ContactPage = () => {
   const theme = useTheme();
@@ -89,7 +90,7 @@ const ContactPage = () => {
             </Box>
             <Box
               component="img"
-              src="/banner.jpg"
+              src={bannerImage}
               alt="Farm"
               sx={{
                 width: { xs: '100%', md: '50%' },

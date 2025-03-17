@@ -14,6 +14,7 @@ import {
   InputLabel,
   Grid,
   Tooltip,
+  Button,
 } from '@mui/material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
@@ -26,6 +27,7 @@ import CancelIcon from '@mui/icons-material/Cancel';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import Navbar from '../components/Navbar';
 import { useOrders } from '../context/OrderContext';
+import { useNavigate } from 'react-router-dom';
 
 const OrderHistoryPage = () => {
   const { orders } = useOrders();
@@ -33,6 +35,7 @@ const OrderHistoryPage = () => {
   const [statusFilter, setStatusFilter] = useState('all');
   const [startDate, setStartDate] = useState(null);
   const [endDate, setEndDate] = useState(null);
+  const navigate = useNavigate();
 
   const getStatusIcon = (status) => {
     if (!status) return <PendingIcon sx={{ color: 'warning.main' }} />;
@@ -79,6 +82,67 @@ const OrderHistoryPage = () => {
       (!endDate || new Date(order.date) <= endDate);
     return matchesSearch && matchesStatus && matchesDate;
   });
+
+  // Empty state
+  if (orders.length === 0) {
+    return (
+      <Box sx={{ minHeight: '100vh', bgcolor: 'white' }}>
+        <Navbar />
+        <Container
+          maxWidth="md"
+          sx={{
+            mt: 8,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: 3
+          }}
+        >
+          <HistoryIcon sx={{ fontSize: 64, color: 'text.secondary' }} />
+          <Typography
+            variant="h4"
+            sx={{
+              fontFamily: 'cursive',
+              fontWeight: 'bold',
+              textAlign: 'center'
+            }}
+          >
+            No Order History
+          </Typography>
+          <Typography
+            sx={{
+              fontFamily: 'cursive',
+              color: 'text.secondary',
+              textAlign: 'center',
+              fontSize: '1.1rem'
+            }}
+          >
+            You haven't placed any orders yet.
+            Start shopping to create your first order!
+          </Typography>
+          <Button
+            variant="contained"
+            onClick={() => navigate('/shop')}
+            sx={{
+              bgcolor: '#b2ebf2',
+              color: 'black',
+              py: 1.5,
+              px: 4,
+              borderRadius: '25px',
+              fontFamily: 'cursive',
+              fontSize: '1.1rem',
+              '&:hover': {
+                bgcolor: '#81d4fa',
+              },
+              mt: 2
+            }}
+          >
+            Shop Now
+          </Button>
+        </Container>
+      </Box>
+    );
+  }
 
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: 'white' }}>
