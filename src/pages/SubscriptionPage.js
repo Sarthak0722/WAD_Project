@@ -7,7 +7,16 @@ import {
   Grid,
   Button,
   useTheme,
-  Stack
+  Stack,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  TextField,
+  Checkbox,
+  FormControlLabel,
+  Alert,
+  DialogContentText
 } from '@mui/material';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CancelIcon from '@mui/icons-material/Cancel';
@@ -20,6 +29,15 @@ const SubscriptionPage = () => {
   const navigate = useNavigate();
   const { addToCart } = useCart();
   const [isSubscribed, setIsSubscribed] = useState(true); // This would come from your auth/subscription context
+  const [openCancelDialog, setOpenCancelDialog] = useState(false);
+  const [openEditDialog, setOpenEditDialog] = useState(false);
+  const [openEditResponseDialog, setOpenEditResponseDialog] = useState(false);
+  const [editCount, setEditCount] = useState(0);
+  const [editFormData, setEditFormData] = useState({
+    oldOrder: '',
+    newOrder: '',
+    confirmLimited: false
+  });
 
   const daysOfWeek = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
   
@@ -40,7 +58,7 @@ const SubscriptionPage = () => {
       id: 'subscription',
       title: 'Monthly Milk Subscription',
       price: 999,
-      image: '/milk-subscription.png',
+      image: require('../assets/images/subscription.jpeg'),
       quantity: 1
     });
     // Navigate to cart
@@ -48,7 +66,51 @@ const SubscriptionPage = () => {
   };
 
   const handleCancelSubscription = () => {
+    setOpenCancelDialog(true);
+  };
+
+  const confirmCancelSubscription = () => {
+    setOpenCancelDialog(false);
     setIsSubscribed(false);
+  };
+
+  const handleEditSubscription = () => {
+    setOpenEditDialog(true);
+  };
+
+  const handleEditDialogClose = () => {
+    setOpenEditDialog(false);
+    setEditFormData({
+      oldOrder: '',
+      newOrder: '',
+      confirmLimited: false
+    });
+  };
+
+  const handleEditInputChange = (e) => {
+    const { name, value, checked, type } = e.target;
+    setEditFormData({
+      ...editFormData,
+      [name]: type === 'checkbox' ? checked : value
+    });
+  };
+
+  const handleEditSubmit = () => {
+    // Close the edit dialog
+    setOpenEditDialog(false);
+    
+    // Increment the edit count
+    setEditCount(prevCount => prevCount + 1);
+    
+    // Show success response dialog
+    setOpenEditResponseDialog(true);
+    
+    // Reset form data
+    setEditFormData({
+      oldOrder: '',
+      newOrder: '',
+      confirmLimited: false
+    });
   };
 
   const getDeliveryIcon = (day) => {
@@ -180,19 +242,21 @@ const SubscriptionPage = () => {
           <Stack direction="row" spacing={2}>
             <Button
               variant="contained"
+              onClick={handleEditSubscription}
+              disabled={editCount >= 2}
               sx={{
-                bgcolor: '#90EE90',
+                bgcolor: editCount >= 2 ? '#e0e0e0' : '#90EE90',
                 color: 'black',
                 py: 1,
                 px: 3,
                 borderRadius: '20px',
                 fontFamily: 'cursive',
                 '&:hover': {
-                  bgcolor: '#7BC47F',
+                  bgcolor: editCount >= 2 ? '#e0e0e0' : '#7BC47F',
                 },
               }}
             >
-              Edit subscription
+              Edit subscription {editCount >= 2 && '(limit reached)'}
             </Button>
             <Button
               variant="contained"
@@ -328,6 +392,212 @@ const SubscriptionPage = () => {
           </Box>
         </Paper>
       </Container>
+
+      {/* Cancel Subscription Confirmation Dialog */}
+      <Dialog
+        open={openCancelDialog}
+        onClose={() => setOpenCancelDialog(false)}
+        PaperProps={{
+          sx: {
+            borderRadius: '16px',
+            p: 1
+          }
+        }}
+      >
+        <DialogTitle sx={{ fontFamily: 'cursive', fontWeight: 'bold', textAlign: 'center' }}>
+          Cancel Subscription?
+        </DialogTitle>
+        <DialogContent>
+          <DialogContentText sx={{ fontFamily: 'cursive', textAlign: 'center' }}>
+            Are you sure you want to cancel your subscription?
+            This action cannot be undone.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions sx={{ justifyContent: 'center', mb: 1 }}>
+          <Button
+            onClick={() => setOpenCancelDialog(false)}
+            sx={{
+              bgcolor: '#90EE90',
+              color: 'black',
+              borderRadius: '20px',
+              fontFamily: 'cursive',
+              '&:hover': {
+                bgcolor: '#7BC47F',
+              },
+              px: 3
+            }}
+          >
+            No, Keep It
+          </Button>
+          <Button
+            onClick={confirmCancelSubscription}
+            sx={{
+              bgcolor: '#FFB6C1',
+              color: 'black',
+              borderRadius: '20px',
+              fontFamily: 'cursive',
+              '&:hover': {
+                bgcolor: '#FF69B4',
+              },
+              px: 3
+            }}
+          >
+            Yes, Cancel
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Edit Subscription Dialog */}
+      <Dialog
+        open={openEditDialog}
+        onClose={handleEditDialogClose}
+        PaperProps={{
+          sx: {
+            borderRadius: '16px',
+            width: '100%',
+            maxWidth: '500px'
+          }
+        }}
+      >
+        <DialogTitle sx={{ fontFamily: 'cursive', fontWeight: 'bold', textAlign: 'center' }}>
+          Edit Subscription
+        </DialogTitle>
+        <DialogContent>
+          <Box component="form" sx={{ mt: 1 }}>
+            <Typography sx={{ fontFamily: 'cursive', mb: 1 }}>
+              You can edit your subscription up to 2 times. 
+              You have used {editCount} edit(s) so far.
+            </Typography>
+            
+            <TextField
+              margin="normal"
+              fullWidth
+              label="Old Order Details"
+              name="oldOrder"
+              value={editFormData.oldOrder}
+              onChange={handleEditInputChange}
+              sx={{ 
+                mb: 3,
+                '& .MuiInputLabel-root': {
+                  fontFamily: 'cursive'
+                },
+                '& .MuiOutlinedInput-root': {
+                  fontFamily: 'cursive'
+                }
+              }}
+            />
+            
+            <TextField
+              margin="normal"
+              fullWidth
+              label="New Order Details"
+              name="newOrder"
+              value={editFormData.newOrder}
+              onChange={handleEditInputChange}
+              sx={{ 
+                mb: 3,
+                '& .MuiInputLabel-root': {
+                  fontFamily: 'cursive'
+                },
+                '& .MuiOutlinedInput-root': {
+                  fontFamily: 'cursive'
+                }
+              }}
+            />
+            
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={editFormData.confirmLimited}
+                  onChange={handleEditInputChange}
+                  name="confirmLimited"
+                  color="primary"
+                />
+              }
+              label="I understand I can only edit my subscription 2 times."
+              sx={{ 
+                fontFamily: 'cursive',
+                display: 'block',
+                mb: 2 
+              }}
+            />
+          </Box>
+        </DialogContent>
+        <DialogActions sx={{ justifyContent: 'center', p: 2 }}>
+          <Button
+            onClick={handleEditDialogClose}
+            sx={{
+              bgcolor: '#FFB6C1',
+              color: 'black',
+              borderRadius: '20px',
+              fontFamily: 'cursive',
+              '&:hover': {
+                bgcolor: '#FF69B4',
+              },
+              px: 3
+            }}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={handleEditSubmit}
+            disabled={!editFormData.oldOrder || !editFormData.newOrder || !editFormData.confirmLimited}
+            sx={{
+              bgcolor: '#90EE90',
+              color: 'black',
+              borderRadius: '20px',
+              fontFamily: 'cursive',
+              '&:hover': {
+                bgcolor: '#7BC47F',
+              },
+              px: 3
+            }}
+          >
+            Submit Changes
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Edit Response Dialog */}
+      <Dialog
+        open={openEditResponseDialog}
+        onClose={() => setOpenEditResponseDialog(false)}
+        PaperProps={{
+          sx: {
+            borderRadius: '16px',
+            p: 1
+          }
+        }}
+      >
+        <DialogTitle sx={{ fontFamily: 'cursive', fontWeight: 'bold', textAlign: 'center' }}>
+          Subscription Updated
+        </DialogTitle>
+        <DialogContent>
+          <Alert severity="success" sx={{ fontFamily: 'cursive', mb: 2 }}>
+            Your subscription has been successfully updated!
+          </Alert>
+          <Typography sx={{ fontFamily: 'cursive', textAlign: 'center' }}>
+            You have {2 - editCount} edit(s) remaining.
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ justifyContent: 'center', mb: 1 }}>
+          <Button
+            onClick={() => setOpenEditResponseDialog(false)}
+            sx={{
+              bgcolor: '#90EE90',
+              color: 'black',
+              borderRadius: '20px',
+              fontFamily: 'cursive',
+              '&:hover': {
+                bgcolor: '#7BC47F',
+              },
+              px: 3
+            }}
+          >
+            OK
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };
