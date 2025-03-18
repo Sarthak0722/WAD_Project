@@ -18,6 +18,7 @@ import ProductsPage from './pages/ProductsPage';
 import CartPage from './pages/CartPage';
 import ContactPage from './pages/ContactPage';
 import OrderHistoryPage from './pages/OrderHistoryPage';
+import SubscriptionPage from './pages/SubscriptionPage';
 
 function App() {
   return (
@@ -38,6 +39,7 @@ function App() {
               <Route path="/cart" element={<CartPage />} />
               <Route path="/contact" element={<ContactPage />} />
               <Route path="/order-history" element={<OrderHistoryPage />} />
+              <Route path="/subscription" element={<SubscriptionPage />} />
             </Routes>
           </Router>
         </CartProvider>

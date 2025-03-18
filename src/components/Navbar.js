@@ -126,7 +126,7 @@ const Navbar = () => {
         </Link>
         {isAuthenticated ? (
           <>
-            <Link to="/calendar" style={{ color: 'inherit' }}>
+            <Link to="/subscription" style={{ color: 'inherit' }}>
               <CalendarMonthIcon 
                 sx={{ 
                   cursor: 'pointer',
