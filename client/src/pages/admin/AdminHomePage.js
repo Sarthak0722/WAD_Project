@@ -27,6 +27,8 @@ import {
   Chip,
   Autocomplete,
   Avatar,
+  Alert,
+  Snackbar,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
@@ -34,8 +36,11 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import SearchIcon from '@mui/icons-material/Search';
 import CloseIcon from '@mui/icons-material/Close';
 import AdminNavbar from '../../components/admin/AdminNavbar';
+import { getAllProducts, createProduct, updateProduct, deleteProduct, updateStock } from '../../services/productService';
+import { useAuth } from '../../contexts/AuthContext';
 
 const AdminHomePage = () => {
+  const { token } = useAuth();
   const [openDialog, setOpenDialog] = useState(false);
   const [openCategoryDialog, setOpenCategoryDialog] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
@@ -43,55 +48,15 @@ const AdminHomePage = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedBrand, setSelectedBrand] = useState(null);
   const [newCategory, setNewCategory] = useState('');
-  const [categories, setCategories] = useState(['Milk', 'Dairy', 'Ice Cream', 'Yoghurt']);
-  const [brands, setBrands] = useState(['AMUL', 'Mother Dairy', 'Nestle', 'Britannia']);
+  const [categories, setCategories] = useState(['Milk', 'Dairy', 'Ice Cream', 'Yoghurt', 'Butter', 'Cream', 'Cheese', 'Other']);
+  const [brands, setBrands] = useState(['AMUL', 'Mother Dairy', 'Nestle', 'Britannia', 'Parag', 'Gokul', 'Govardhan']);
   const [selectedImage, setSelectedImage] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
   const [stockAdjustment, setStockAdjustment] = useState({ type: 'add', amount: 0 });
-
-  const [inventoryItems, setInventoryItems] = useState([
-    {
-      id: 1,
-      name: 'Fresh Milk',
-      brand: 'AMUL',
-      category: 'Milk',
-      price: 60,
-      stock: 100,
-      unit: 'Litre',
-      image: 'milk.jpeg'
-    },
-    {
-      id: 2,
-      name: 'Curd',
-      brand: 'Mother Dairy',
-      category: 'Dairy',
-      price: 40,
-      stock: 50,
-      unit: 'Kg',
-      image: 'curd.jpeg'
-    },
-    {
-      id: 3,
-      name: 'Butter',
-      brand: 'AMUL',
-      category: 'Dairy',
-      price: 120,
-      stock: 40,
-      unit: 'Pack',
-      image: 'butter.jpeg'
-    },
-    {
-      id: 4,
-      name: 'Vanilla Ice Cream',
-      brand: 'Mother Dairy',
-      category: 'Ice Cream',
-      price: 150,
-      stock: 35,
-      unit: 'Pack',
-      image: 'vanilla-ice-cream.jpeg'
-    },
-  ]);
-
+  const [inventoryItems, setInventoryItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [successMessage, setSuccessMessage] = useState('');
   const [formData, setFormData] = useState({
     name: '',
     brand: '',
@@ -104,8 +69,26 @@ const AdminHomePage = () => {
 
   const units = ['Litre', 'Kg', 'Piece', 'Pack', 'Box'];
 
-  // Remove the static brands array and calculate it from inventory
-  const availableBrands = [...new Set(inventoryItems.map(item => item.brand))];
+  useEffect(() => {
+    fetchProducts();
+  }, [token]);
+
+  const fetchProducts = async () => {
+    try {
+      setLoading(true);
+      const products = await getAllProducts(token);
+      setInventoryItems(products);
+      // Update categories and brands from actual data
+      const uniqueCategories = [...new Set(products.map(item => item.category))];
+      const uniqueBrands = [...new Set(products.map(item => item.brand))];
+      setCategories(uniqueCategories);
+      setBrands(uniqueBrands);
+    } catch (error) {
+      setError(error.message || 'Error fetching products');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Filter items based on search query and selected brand
   const filteredItems = inventoryItems.filter(item => {
@@ -141,7 +124,7 @@ const AdminHomePage = () => {
       setEditingItem(item);
       setFormData(item);
       setImagePreview(item.image);
-      setStockAdjustment({ type: 'add', amount: 0 }); // Reset stock adjustment
+      setStockAdjustment({ type: 'add', amount: 0 });
     } else {
       setEditingItem(null);
       setFormData({
@@ -184,7 +167,9 @@ const AdminHomePage = () => {
 
   const handleAddCategory = () => {
     if (newCategory && !categories.includes(newCategory)) {
-      setCategories([...categories, newCategory]);
+      setCategories(prev => [...prev, newCategory]);
+      // Switch to the new category tab
+      setSelectedTab(categories.length + 1);
     }
     handleCloseCategoryDialog();
   };
@@ -203,10 +188,11 @@ const AdminHomePage = () => {
       setSelectedImage(file);
       const reader = new FileReader();
       reader.onloadend = () => {
-        setImagePreview(reader.result);
+        const base64String = reader.result;
+        setImagePreview(base64String);
         setFormData(prev => ({
           ...prev,
-          image: reader.result
+          image: base64String
         }));
       };
       reader.readAsDataURL(file);
@@ -236,31 +222,55 @@ const AdminHomePage = () => {
     }));
   };
 
-  const handleSubmit = () => {
-    if (editingItem) {
-      setInventoryItems(prev =>
-        prev.map(item =>
-          item.id === editingItem.id ? { ...item, ...formData } : item
-        )
-      );
-    } else {
-      // Add new brand if it doesn't exist
-      if (!brands.includes(formData.brand)) {
-        setBrands([...brands, formData.brand]);
+  const handleSubmit = async () => {
+    try {
+      if (!formData.name?.trim() || !formData.brand?.trim() || !formData.category?.trim() || 
+          !formData.price || !formData.stock || !formData.unit || !formData.image) {
+        throw new Error('Please fill in all required fields');
       }
-      setInventoryItems(prev => [
-        ...prev,
-        {
-          id: prev.length + 1,
-          ...formData
-        }
-      ]);
+
+      // Validate and format the data
+      const productData = {
+        ...formData,
+        price: Number(formData.price),
+        stock: Number(formData.stock),
+        isActive: true,
+        createdAt: new Date().toISOString()
+      };
+
+      // Add new brand to the list if it doesn't exist
+      if (productData.brand && !brands.includes(productData.brand)) {
+        setBrands(prev => [...prev, productData.brand]);
+      }
+
+      // Add new category to the list if it doesn't exist
+      if (productData.category && !categories.includes(productData.category)) {
+        setCategories(prev => [...prev, productData.category]);
+      }
+
+      if (editingItem) {
+        await updateProduct(editingItem._id, productData);
+        setSuccessMessage('Product updated successfully');
+      } else {
+        await createProduct(productData);
+        setSuccessMessage('Product added successfully');
+      }
+      fetchProducts();
+      handleCloseDialog();
+    } catch (error) {
+      console.error('Error saving product:', error);
+      setError(error.response?.data?.message || error.message || 'Error saving product');
     }
-    handleCloseDialog();
   };
 
-  const handleDelete = (id) => {
-    setInventoryItems(prev => prev.filter(item => item.id !== id));
+  const handleDelete = async (id) => {
+    try {
+      await deleteProduct(id, token);
+      setSuccessMessage('Product deleted successfully');
+      fetchProducts();
+    } catch (error) {
+      setError(error.message || 'Error deleting product');
+    }
   };
 
   const handleDeleteCategory = (categoryToDelete) => {
@@ -268,7 +278,7 @@ const AdminHomePage = () => {
     const productsInCategory = inventoryItems.filter(item => item.category === categoryToDelete);
     
     if (productsInCategory.length > 0) {
-      alert('Cannot delete category that contains products. Please remove or reassign all products first.');
+      setError('Cannot delete category that contains products. Please remove or reassign all products first.');
       return;
     }
     
@@ -285,7 +295,7 @@ const AdminHomePage = () => {
       
       <Container maxWidth="lg" sx={{ mt: 4, pb: 8 }}>
         {/* Header Section with Search and Filter */}
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
+        <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <Typography
             variant="h4"
             sx={{
@@ -294,9 +304,9 @@ const AdminHomePage = () => {
               color: 'black'
             }}
           >
-            Inventory Management
+            Manage The Inventory
           </Typography>
-          <Box sx={{ display: 'flex', gap: 2 }}>
+          <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
             <TextField
               placeholder="Search products..."
               value={searchQuery}
@@ -326,13 +336,13 @@ const AdminHomePage = () => {
               }}
             />
             <Autocomplete
-              options={availableBrands}
+              options={brands}
               value={selectedBrand}
               onChange={handleBrandChange}
               renderInput={(params) => (
                 <TextField
                   {...params}
-                  placeholder="Filter by Brand"
+                  placeholder="Filter by brand"
                   sx={{
                     width: 200,
                     '& .MuiOutlinedInput-root': {
@@ -351,13 +361,11 @@ const AdminHomePage = () => {
             />
             <Button
               variant="contained"
-              startIcon={<AddIcon />}
               onClick={() => handleOpenDialog()}
+              startIcon={<AddIcon />}
               sx={{
                 bgcolor: '#90EE90',
                 color: 'black',
-                py: 1,
-                px: 3,
                 borderRadius: '20px',
                 fontFamily: 'cursive',
                 '&:hover': {
@@ -365,7 +373,7 @@ const AdminHomePage = () => {
                 },
               }}
             >
-              Add New Item
+              Add Product
             </Button>
           </Box>
         </Box>
@@ -408,25 +416,29 @@ const AdminHomePage = () => {
                 label={
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                     {category}
-                    <IconButton
-                      size="small"
+                    <span
                       onClick={(e) => {
                         e.stopPropagation();
                         handleDeleteCategory(category);
                       }}
-                      sx={{
+                      style={{
+                        cursor: 'pointer',
                         color: 'rgba(0, 0, 0, 0.4)',
-                        padding: 0,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
                         width: '16px',
                         height: '16px',
-                        '&:hover': {
-                          backgroundColor: 'transparent',
-                          color: 'rgba(0, 0, 0, 0.8)',
-                        },
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.color = 'rgba(0, 0, 0, 0.8)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.color = 'rgba(0, 0, 0, 0.4)';
                       }}
                     >
                       <CloseIcon sx={{ fontSize: '12px' }} />
-                    </IconButton>
+                    </span>
                   </Box>
                 }
               />
@@ -457,7 +469,15 @@ const AdminHomePage = () => {
               </TableRow>
             </TableHead>
             <TableBody>
-              {(selectedTab === 0 ? filteredItems : itemsByCategory[categories[selectedTab - 1]] || []).length === 0 ? (
+              {loading ? (
+                <TableRow>
+                  <TableCell colSpan={8} align="center" sx={{ py: 4 }}>
+                    <Typography variant="h6" sx={{ fontFamily: 'cursive', color: 'text.secondary' }}>
+                      Loading...
+                    </Typography>
+                  </TableCell>
+                </TableRow>
+              ) : (selectedTab === 0 ? filteredItems : itemsByCategory[categories[selectedTab - 1]] || []).length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={8} align="center" sx={{ py: 4 }}>
                     <Typography variant="h6" sx={{ fontFamily: 'cursive', color: 'text.secondary' }}>
@@ -467,7 +487,7 @@ const AdminHomePage = () => {
                 </TableRow>
               ) : (
                 (selectedTab === 0 ? filteredItems : itemsByCategory[categories[selectedTab - 1]] || []).map((item) => (
-                  <TableRow key={item.id} sx={{ '&:hover': { bgcolor: '#f5f5f5' } }}>
+                  <TableRow key={item._id} sx={{ '&:hover': { bgcolor: '#f5f5f5' } }}>
                     <TableCell>
                       <Avatar
                         src={item.image}
@@ -484,13 +504,13 @@ const AdminHomePage = () => {
                     <TableCell>
                       <IconButton
                         onClick={() => handleOpenDialog(item)}
-                        sx={{ color: '#90EE90' }}
+                        sx={{ color: 'primary.main' }}
                       >
                         <EditIcon />
                       </IconButton>
                       <IconButton
-                        onClick={() => handleDelete(item.id)}
-                        sx={{ color: '#FFB6C1' }}
+                        onClick={() => handleDelete(item._id)}
+                        sx={{ color: 'error.main' }}
                       >
                         <DeleteIcon />
                       </IconButton>
@@ -503,32 +523,32 @@ const AdminHomePage = () => {
         </TableContainer>
       </Container>
 
-      {/* Add/Edit Dialog */}
-      <Dialog
-        open={openDialog}
-        onClose={handleCloseDialog}
+      {/* Add/Edit Product Dialog */}
+      <Dialog 
+        open={openDialog} 
+        onClose={handleCloseDialog} 
+        maxWidth="sm" 
+        fullWidth
         PaperProps={{
           sx: {
-            borderRadius: '16px',
-            width: '100%',
-            maxWidth: '500px'
+            maxHeight: '90vh',
+            overflowY: 'auto'
           }
         }}
       >
-        <DialogTitle sx={{ fontFamily: 'cursive', fontWeight: 'bold', textAlign: 'center' }}>
-          {editingItem ? 'Edit Item' : 'Add New Item'}
+        <DialogTitle sx={{ fontFamily: 'cursive', pb: 1 }}>
+          {editingItem ? 'Edit Product' : 'Add New Product'}
         </DialogTitle>
-        <DialogContent>
-          <Box component="form" sx={{ mt: 1 }}>
+        <DialogContent sx={{ pb: 2 }}>
+          <Box sx={{ mt: 2 }}>
             <TextField
-              margin="normal"
               fullWidth
               label="Name"
               name="name"
               value={formData.name}
               onChange={handleInputChange}
               sx={{ 
-                mb: 2,
+                mb: 3,
                 '& .MuiInputLabel-root': {
                   fontFamily: 'cursive'
                 },
@@ -538,43 +558,75 @@ const AdminHomePage = () => {
               }}
             />
 
-            <TextField
-              margin="normal"
-              fullWidth
-              label="Brand"
-              name="brand"
+            <Autocomplete
+              freeSolo
+              options={brands}
               value={formData.brand}
-              onChange={handleInputChange}
-              sx={{ 
-                mb: 2,
-                '& .MuiInputLabel-root': {
-                  fontFamily: 'cursive'
-                },
-                '& .MuiOutlinedInput-root': {
-                  fontFamily: 'cursive'
-                }
+              onChange={(event, newValue) => {
+                setFormData(prev => ({
+                  ...prev,
+                  brand: newValue || ''
+                }));
               }}
+              onInputChange={(event, newInputValue) => {
+                setFormData(prev => ({
+                  ...prev,
+                  brand: newInputValue
+                }));
+              }}
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  label="Brand"
+                  margin="normal"
+                  fullWidth
+                  sx={{ 
+                    mb: 2,
+                    '& .MuiInputLabel-root': {
+                      fontFamily: 'cursive'
+                    },
+                    '& .MuiOutlinedInput-root': {
+                      fontFamily: 'cursive'
+                    }
+                  }}
+                />
+              )}
             />
-            
-            <FormControl fullWidth sx={{ mb: 2 }}>
-              <InputLabel sx={{ fontFamily: 'cursive' }}>Category</InputLabel>
-              <Select
-                name="category"
-                value={formData.category}
-                onChange={handleInputChange}
-                label="Category"
-                sx={{ 
-                  fontFamily: 'cursive',
-                  '& .MuiOutlinedInput-notchedOutline': {
-                    borderColor: 'rgba(0, 0, 0, 0.23)',
-                  },
-                }}
-              >
-                {categories.map((category) => (
-                  <MenuItem key={category} value={category}>{category}</MenuItem>
-                ))}
-              </Select>
-            </FormControl>
+
+            <Autocomplete
+              freeSolo
+              options={categories}
+              value={formData.category}
+              onChange={(event, newValue) => {
+                setFormData(prev => ({
+                  ...prev,
+                  category: newValue || ''
+                }));
+              }}
+              onInputChange={(event, newInputValue) => {
+                setFormData(prev => ({
+                  ...prev,
+                  category: newInputValue
+                }));
+              }}
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  label="Category"
+                  margin="normal"
+                  fullWidth
+                  sx={{ 
+                    mb: 2,
+                    '& .MuiInputLabel-root': {
+                      fontFamily: 'cursive'
+                    },
+                    '& .MuiOutlinedInput-root': {
+                      fontFamily: 'cursive'
+                    }
+                  }}
+                />
+              )}
+            />
 
             <TextField
               margin="normal"
@@ -596,40 +648,33 @@ const AdminHomePage = () => {
               }}
             />
 
+            {/* Stock Section */}
             {editingItem ? (
-              <Box sx={{ mb: 2 }}>
-                <Typography sx={{ fontFamily: 'cursive', mb: 1 }}>
+              <Box sx={{ mb: 3 }}>
+                <Typography variant="subtitle1" sx={{ mb: 1, fontFamily: 'cursive' }}>
                   Current Stock: {editingItem.stock}
                 </Typography>
-                <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
-                  <FormControl sx={{ width: '30%' }}>
+                <Box sx={{ display: 'flex', gap: 2, alignItems: 'flex-start' }}>
+                  <FormControl sx={{ minWidth: 120 }}>
                     <InputLabel sx={{ fontFamily: 'cursive' }}>Action</InputLabel>
                     <Select
                       name="stockAdjustmentType"
                       value={stockAdjustment.type}
                       onChange={handleStockAdjustment}
-                      label="Action"
-                      sx={{ 
-                        fontFamily: 'cursive',
-                        '& .MuiOutlinedInput-notchedOutline': {
-                          borderColor: 'rgba(0, 0, 0, 0.23)',
-                        },
-                      }}
+                      sx={{ fontFamily: 'cursive' }}
                     >
                       <MenuItem value="add">Add</MenuItem>
-                      <MenuItem value="remove">Remove</MenuItem>
+                      <MenuItem value="subtract">Subtract</MenuItem>
                     </Select>
                   </FormControl>
                   <TextField
-                    margin="normal"
-                    label="Amount"
                     name="stockAdjustmentAmount"
+                    label="Amount"
                     type="number"
                     value={stockAdjustment.amount}
                     onChange={handleStockAdjustment}
                     inputProps={{ min: 0 }}
-                    sx={{ 
-                      width: '70%',
+                    sx={{
                       '& .MuiInputLabel-root': {
                         fontFamily: 'cursive'
                       },
@@ -639,9 +684,6 @@ const AdminHomePage = () => {
                     }}
                   />
                 </Box>
-                <Typography sx={{ fontFamily: 'cursive', mt: 1, fontWeight: 'bold' }}>
-                  New Stock: {formData.stock}
-                </Typography>
               </Box>
             ) : (
               <TextField
@@ -654,7 +696,7 @@ const AdminHomePage = () => {
                 onChange={handleInputChange}
                 inputProps={{ min: 0 }}
                 sx={{ 
-                  mb: 2,
+                  mb: 3,
                   '& .MuiInputLabel-root': {
                     fontFamily: 'cursive'
                   },
@@ -665,13 +707,13 @@ const AdminHomePage = () => {
               />
             )}
 
-            <FormControl fullWidth sx={{ mb: 2 }}>
+            {/* Unit Selection */}
+            <FormControl fullWidth sx={{ mb: 3 }}>
               <InputLabel sx={{ fontFamily: 'cursive' }}>Unit</InputLabel>
               <Select
                 name="unit"
                 value={formData.unit}
                 onChange={handleInputChange}
-                label="Unit"
                 sx={{ 
                   fontFamily: 'cursive',
                   '& .MuiOutlinedInput-notchedOutline': {
@@ -685,43 +727,44 @@ const AdminHomePage = () => {
               </Select>
             </FormControl>
 
-            <Box sx={{ mb: 2 }}>
+            {/* Image Upload */}
+            <Box sx={{ mb: 3 }}>
               <input
+                type="file"
                 accept="image/*"
+                onChange={handleImageChange}
                 style={{ display: 'none' }}
                 id="image-upload"
-                type="file"
-                onChange={handleImageChange}
               />
               <label htmlFor="image-upload">
                 <Button
                   component="span"
                   variant="outlined"
                   sx={{
-                    width: '100%',
                     fontFamily: 'cursive',
-                    borderColor: 'rgba(0, 0, 0, 0.23)',
-                    '&:hover': {
-                      borderColor: 'primary.main',
-                    },
+                    mb: 2
                   }}
                 >
-                  {imagePreview ? 'Change Image' : 'Upload Image'}
+                  Upload Image
                 </Button>
               </label>
               {imagePreview && (
-                <Box sx={{ mt: 1, display: 'flex', justifyContent: 'center' }}>
-                  <Avatar
+                <Box sx={{ mt: 2, textAlign: 'center' }}>
+                  <img
                     src={imagePreview}
                     alt="Preview"
-                    sx={{ width: 100, height: 100, borderRadius: '8px' }}
+                    style={{
+                      maxWidth: '100%',
+                      maxHeight: '200px',
+                      objectFit: 'contain'
+                    }}
                   />
                 </Box>
               )}
             </Box>
           </Box>
         </DialogContent>
-        <DialogActions sx={{ justifyContent: 'center', p: 2 }}>
+        <DialogActions sx={{ justifyContent: 'center', p: 2, borderTop: '1px solid rgba(0, 0, 0, 0.12)' }}>
           <Button
             onClick={handleCloseDialog}
             sx={{
@@ -739,7 +782,15 @@ const AdminHomePage = () => {
           </Button>
           <Button
             onClick={handleSubmit}
-            disabled={!formData.name || !formData.brand || !formData.category || !formData.price || !formData.stock || !formData.unit || !formData.image}
+            disabled={
+              !formData.name?.trim() ||
+              !formData.brand?.trim() ||
+              !formData.category?.trim() ||
+              !formData.price ||
+              !formData.stock ||
+              !formData.unit ||
+              !formData.image
+            }
             sx={{
               bgcolor: '#90EE90',
               color: 'black',
@@ -757,29 +808,17 @@ const AdminHomePage = () => {
       </Dialog>
 
       {/* Add Category Dialog */}
-      <Dialog
-        open={openCategoryDialog}
-        onClose={handleCloseCategoryDialog}
-        PaperProps={{
-          sx: {
-            borderRadius: '16px',
-            width: '100%',
-            maxWidth: '400px'
-          }
-        }}
-      >
-        <DialogTitle sx={{ fontFamily: 'cursive', fontWeight: 'bold', textAlign: 'center' }}>
-          Add New Category
-        </DialogTitle>
+      <Dialog open={openCategoryDialog} onClose={handleCloseCategoryDialog}>
+        <DialogTitle sx={{ fontFamily: 'cursive' }}>Add New Category</DialogTitle>
         <DialogContent>
           <TextField
-            margin="normal"
-            fullWidth
+            autoFocus
+            margin="dense"
             label="Category Name"
+            fullWidth
             value={newCategory}
             onChange={(e) => setNewCategory(e.target.value)}
             sx={{ 
-              mt: 2,
               '& .MuiInputLabel-root': {
                 fontFamily: 'cursive'
               },
@@ -789,18 +828,12 @@ const AdminHomePage = () => {
             }}
           />
         </DialogContent>
-        <DialogActions sx={{ justifyContent: 'center', p: 2 }}>
+        <DialogActions>
           <Button
             onClick={handleCloseCategoryDialog}
             sx={{
-              bgcolor: '#FFB6C1',
-              color: 'black',
-              borderRadius: '20px',
               fontFamily: 'cursive',
-              '&:hover': {
-                bgcolor: '#FF69B4',
-              },
-              px: 3
+              color: 'text.secondary'
             }}
           >
             Cancel
@@ -809,20 +842,38 @@ const AdminHomePage = () => {
             onClick={handleAddCategory}
             disabled={!newCategory}
             sx={{
-              bgcolor: '#90EE90',
-              color: 'black',
-              borderRadius: '20px',
               fontFamily: 'cursive',
-              '&:hover': {
-                bgcolor: '#7BC47F',
-              },
-              px: 3
+              color: 'primary.main'
             }}
           >
             Add
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* Error Snackbar */}
+      <Snackbar
+        open={!!error}
+        autoHideDuration={6000}
+        onClose={() => setError(null)}
+        anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+      >
+        <Alert onClose={() => setError(null)} severity="error" sx={{ width: '100%' }}>
+          {error}
+        </Alert>
+      </Snackbar>
+
+      {/* Success Snackbar */}
+      <Snackbar
+        open={!!successMessage}
+        autoHideDuration={6000}
+        onClose={() => setSuccessMessage('')}
+        anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+      >
+        <Alert onClose={() => setSuccessMessage('')} severity="success" sx={{ width: '100%' }}>
+          {successMessage}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 };

@@ -6,7 +6,7 @@ import 'bootstrap/dist/css/bootstrap.min.css';
 import theme from './theme/theme';
 import { CartProvider } from './context/CartContext';
 import { OrderProvider } from './context/OrderContext';
-import authService from './services/authService';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
 
 // Auth Pages
 import LoginPage from './pages/auth/LoginPage';
@@ -28,10 +28,12 @@ import ReportsPage from './pages/admin/ReportsPage';
 
 // Protected route component
 const ProtectedAdminRoute = ({ children }) => {
-  if (!authService.isAuthenticated()) {
+  const { isAuthenticated, isAdmin } = useAuth();
+  
+  if (!isAuthenticated()) {
     return <Navigate to="/login" />;
   }
-  if (!authService.isAdmin()) {
+  if (!isAdmin()) {
     return <Navigate to="/" />;
   }
   return children;
@@ -41,68 +43,70 @@ function App() {
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <OrderProvider>
-        <CartProvider>
-          <Router>
-            <Routes>
-              {/* Auth Routes */}
-              <Route path="/login" element={<LoginPage />} />
-              <Route path="/register" element={<RegisterPage />} />
-              
-              {/* Main Routes */}
-              <Route path="/" element={<HomePage />} />
-              <Route path="/shop" element={<ShopPage />} />
-              <Route path="/products/:category" element={<ProductsPage />} />
-              <Route path="/cart" element={<CartPage />} />
-              <Route path="/contact" element={<ContactPage />} />
-              <Route path="/order-history" element={<OrderHistoryPage />} />
-              <Route path="/subscription" element={<SubscriptionPage />} />
+      <AuthProvider>
+        <OrderProvider>
+          <CartProvider>
+            <Router>
+              <Routes>
+                {/* Auth Routes */}
+                <Route path="/login" element={<LoginPage />} />
+                <Route path="/register" element={<RegisterPage />} />
+                
+                {/* Main Routes */}
+                <Route path="/" element={<HomePage />} />
+                <Route path="/shop" element={<ShopPage />} />
+                <Route path="/products/:category" element={<ProductsPage />} />
+                <Route path="/cart" element={<CartPage />} />
+                <Route path="/contact" element={<ContactPage />} />
+                <Route path="/order-history" element={<OrderHistoryPage />} />
+                <Route path="/subscription" element={<SubscriptionPage />} />
 
-              {/* Admin Routes */}
-              <Route 
-                path="/admin" 
-                element={
-                  <ProtectedAdminRoute>
-                    <AdminHomePage />
-                  </ProtectedAdminRoute>
-                } 
-              />
-              <Route 
-                path="/admin/subscribers" 
-                element={
-                  <ProtectedAdminRoute>
-                    <SubscribersPage />
-                  </ProtectedAdminRoute>
-                } 
-              />
-              <Route
-                path="/admin/setup"
-                element={
-                  <ProtectedAdminRoute>
-                    <SetupPage />
-                  </ProtectedAdminRoute>
-                }
-              />
-              <Route
-                path="/admin/orders"
-                element={
-                  <ProtectedAdminRoute>
-                    <OrdersPage />
-                  </ProtectedAdminRoute>
-                }
-              />
-              <Route
-                path="/admin/reports"
-                element={
-                  <ProtectedAdminRoute>
-                    <ReportsPage />
-                  </ProtectedAdminRoute>
-                }
-              />
-            </Routes>
-          </Router>
-        </CartProvider>
-      </OrderProvider>
+                {/* Admin Routes */}
+                <Route 
+                  path="/admin" 
+                  element={
+                    <ProtectedAdminRoute>
+                      <AdminHomePage />
+                    </ProtectedAdminRoute>
+                  } 
+                />
+                <Route 
+                  path="/admin/subscribers" 
+                  element={
+                    <ProtectedAdminRoute>
+                      <SubscribersPage />
+                    </ProtectedAdminRoute>
+                  } 
+                />
+                <Route
+                  path="/admin/setup"
+                  element={
+                    <ProtectedAdminRoute>
+                      <SetupPage />
+                    </ProtectedAdminRoute>
+                  }
+                />
+                <Route
+                  path="/admin/orders"
+                  element={
+                    <ProtectedAdminRoute>
+                      <OrdersPage />
+                    </ProtectedAdminRoute>
+                  }
+                />
+                <Route
+                  path="/admin/reports"
+                  element={
+                    <ProtectedAdminRoute>
+                      <ReportsPage />
+                    </ProtectedAdminRoute>
+                  }
+                />
+              </Routes>
+            </Router>
+          </CartProvider>
+        </OrderProvider>
+      </AuthProvider>
     </ThemeProvider>
   );
 }
