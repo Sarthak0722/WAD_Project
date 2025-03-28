@@ -1,69 +1,149 @@
-import React, { useState } from 'react';
-import { Box, Container, Typography, InputBase, IconButton } from '@mui/material';
+import React, { useState, useEffect } from 'react';
+import { 
+  Box, 
+  Container, 
+  Typography, 
+  InputBase, 
+  IconButton,
+  Card,
+  CardMedia,
+  CardContent,
+  CardActions,
+  Button,
+  Select,
+  MenuItem,
+  FormControl,
+  InputLabel,
+  CircularProgress,
+  Grid,
+  Divider,
+  Stack
+} from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import RestaurantIcon from '@mui/icons-material/Restaurant';
+import SortIcon from '@mui/icons-material/Sort';
+import FilterAltIcon from '@mui/icons-material/FilterAlt';
 import Navbar from '../components/Navbar';
-import ProductCard from '../components/ProductCard';
 import { useParams } from 'react-router-dom';
-import productImage from '../assets/images/ProductsMilk.png';
-
-// Mock data - in a real app, this would come from an API
-const mockProducts = {
-  milk: Array(10).fill({
-    title: 'Amul milk',
-    price: '100',
-    image: productImage,
-  }),
-  yoghurt: Array(10).fill({
-    title: 'Amul Yoghurt',
-    price: '80',
-    image: productImage,
-  }),
-  butter: Array(10).fill({
-    title: 'Amul Butter',
-    price: '120',
-    image: productImage,
-  }),
-  cream: Array(10).fill({
-    title: 'Amul Cream',
-    price: '90',
-    image: productImage,
-  }),
-  'ice-cream': Array(10).fill({
-    title: 'Amul Ice Cream',
-    price: '150',
-    image: productImage,
-  }),
-  other: Array(10).fill({
-    title: 'Other Dairy',
-    price: '100',
-    image: productImage,
-  }),
-};
+import { getProducts } from '../services/productService';
 
 const ProductsPage = () => {
   const { category = 'milk' } = useParams();
   const [searchQuery, setSearchQuery] = useState('');
+  const [products, setProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [selectedVariants, setSelectedVariants] = useState({});
+  const [selectedBrand, setSelectedBrand] = useState('all');
+  const [sortOrder, setSortOrder] = useState('none');
+  const [brands, setBrands] = useState([]);
 
-  const products = mockProducts[category.toLowerCase()] || [];
-  const filteredProducts = products.filter(product =>
-    product.title.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  useEffect(() => {
+    fetchProducts();
+  }, [category]);
+
+  const fetchProducts = async () => {
+    try {
+      setLoading(true);
+      const allProducts = await getProducts();
+      const categoryProducts = allProducts.filter(
+        product => product.category.toLowerCase() === category.toLowerCase()
+      );
+      setProducts(categoryProducts);
+      
+      // Extract unique brands
+      const uniqueBrands = [...new Set(categoryProducts.map(product => product.brand))];
+      setBrands(uniqueBrands);
+      
+      // Initialize selected variants
+      const initialSelectedVariants = {};
+      categoryProducts.forEach(product => {
+        initialSelectedVariants[product._id] = product.variants[0];
+      });
+      setSelectedVariants(initialSelectedVariants);
+    } catch (err) {
+      setError('Failed to fetch products');
+      console.error('Error fetching products:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleVariantChange = (productId, variant) => {
+    setSelectedVariants(prev => ({
+      ...prev,
+      [productId]: variant
+    }));
+  };
+
+  const getMinPrice = (product) => {
+    return Math.min(...product.variants.map(v => v.price));
+  };
+
+  const filteredAndSortedProducts = products
+    .filter(product =>
+      (searchQuery === '' || 
+       product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+       product.brand.toLowerCase().includes(searchQuery.toLowerCase())) &&
+      (selectedBrand === 'all' || product.brand === selectedBrand)
+    )
+    .sort((a, b) => {
+      if (sortOrder === 'none') return 0;
+      const priceA = getMinPrice(a);
+      const priceB = getMinPrice(b);
+      return sortOrder === 'asc' ? priceA - priceB : priceB - priceA;
+    });
+
+  if (loading) {
+    return (
+      <Box 
+        sx={{ 
+          minHeight: '100vh', 
+          display: 'flex', 
+          justifyContent: 'center', 
+          alignItems: 'center',
+          bgcolor: 'white' 
+        }}
+      >
+        <CircularProgress />
+      </Box>
+    );
+  }
+
+  if (error) {
+    return (
+      <Box 
+        sx={{ 
+          minHeight: '100vh', 
+          display: 'flex', 
+          justifyContent: 'center', 
+          alignItems: 'center',
+          bgcolor: 'white' 
+        }}
+      >
+        <Typography color="error">{error}</Typography>
+      </Box>
+    );
+  }
 
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: 'white' }}>
       <Navbar />
-      <Container maxWidth="lg" sx={{ mt: 4, mb: 8 }}>
-        {/* Category Title with Icons */}
-        <Box sx={{ textAlign: 'center', mb: 4 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2 }}>
-            <RestaurantIcon 
-              sx={{ 
-                fontSize: 40
-              }} 
-            />
+      <Container maxWidth="lg" sx={{ mt: 3, mb: 4 }}>
+        {/* Header Section with Title and Controls */}
+        <Box sx={{ 
+          display: 'flex', 
+          flexDirection: { xs: 'column', sm: 'row' },
+          alignItems: { xs: 'stretch', sm: 'center' },
+          justifyContent: 'space-between',
+          mb: 3,
+          gap: 2
+        }}>
+          {/* Category Title */}
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <RestaurantIcon sx={{ fontSize: 28 }} />
             <Typography
-              variant="h3"
+              variant="h4"
               sx={{
                 fontFamily: 'cursive',
                 fontWeight: 'bold',
@@ -72,64 +152,238 @@ const ProductsPage = () => {
             >
               {category}
             </Typography>
-            <RestaurantIcon 
-              sx={{ 
-                fontSize: 40
-              }} 
-            />
           </Box>
-        </Box>
 
-        {/* Search Bar */}
-        <Box
-          sx={{
-            display: 'flex',
-            alignItems: 'center',
-            bgcolor: '#f0f0f0',
-            borderRadius: '25px',
-            p: '2px 16px',
-            mb: 6,
-            maxWidth: '600px',
-            mx: 'auto'
-          }}
-        >
-          <InputBase
-            placeholder="Search for your favorite product"
-            sx={{
-              flex: 1,
-              fontFamily: 'cursive',
-              fontSize: '1.1rem',
-              py: 1
+          {/* Controls Section */}
+          <Stack 
+            direction={{ xs: 'column', sm: 'row' }} 
+            spacing={2} 
+            sx={{ 
+              minWidth: { sm: '400px' },
+              alignItems: 'center'
             }}
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
-          <IconButton sx={{ p: '10px' }}>
-            <SearchIcon />
-          </IconButton>
+          >
+            {/* Brand Filter */}
+            <FormControl size="small" sx={{ minWidth: 120 }}>
+              <Select
+                value={selectedBrand}
+                onChange={(e) => setSelectedBrand(e.target.value)}
+                displayEmpty
+                sx={{ 
+                  height: '36px',
+                  fontFamily: 'cursive',
+                  bgcolor: 'white',
+                  '& .MuiSelect-select': { 
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 1
+                  }
+                }}
+              >
+                <MenuItem value="all">
+                  <FilterAltIcon fontSize="small" />
+                  All Brands
+                </MenuItem>
+                {brands.map(brand => (
+                  <MenuItem key={brand} value={brand}>{brand}</MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+
+            {/* Sort by Price */}
+            <FormControl size="small" sx={{ minWidth: 120 }}>
+              <Select
+                value={sortOrder}
+                onChange={(e) => setSortOrder(e.target.value)}
+                displayEmpty
+                sx={{ 
+                  height: '36px',
+                  fontFamily: 'cursive',
+                  bgcolor: 'white',
+                  '& .MuiSelect-select': { 
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 1
+                  }
+                }}
+              >
+                <MenuItem value="none">
+                  <SortIcon fontSize="small" />
+                  Price: None
+                </MenuItem>
+                <MenuItem value="asc">Price: Low to High</MenuItem>
+                <MenuItem value="desc">Price: High to Low</MenuItem>
+              </Select>
+            </FormControl>
+
+            {/* Search Bar */}
+            <Box
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                bgcolor: 'white',
+                borderRadius: '4px',
+                border: '1px solid #ccc',
+                height: '36px',
+                width: { xs: '100%', sm: '160px' }
+              }}
+            >
+              <InputBase
+                placeholder="Search..."
+                sx={{
+                  flex: 1,
+                  fontSize: '0.9rem',
+                  pl: 1
+                }}
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+              <IconButton size="small" sx={{ p: '4px' }}>
+                <SearchIcon fontSize="small" />
+              </IconButton>
+            </Box>
+          </Stack>
         </Box>
 
         {/* Products Grid */}
-        <Box
+        <Grid container spacing={1.5}>
+          {filteredAndSortedProducts.map((product) => (
+            <Grid item xs={6} sm={4} md={3} lg={2.4} key={product._id}>
+              <Card 
           sx={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
-            gap: 3,
-            p: 2,
-            bgcolor: '#f5f5f5',
-            borderRadius: '16px'
-          }}
-        >
-          {filteredProducts.map((product, index) => (
-            <ProductCard
-              key={index}
-              title={product.title}
-              price={product.price}
+                  height: '100%',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  borderRadius: 1.5,
+                  boxShadow: 1,
+                  '&:hover': {
+                    boxShadow: 3,
+                  },
+                }}
+              >
+                <CardMedia
+                  component="img"
+                  height="140"
               image={product.image}
-              onClick={() => console.log(`Added ${product.title} to cart`)}
-            />
+                  alt={product.name}
+                  sx={{ objectFit: 'contain', p: 1 }}
+                />
+                <CardContent sx={{ flexGrow: 1, p: 1.25, pb: 0.5 }}>
+                  <Typography 
+                    gutterBottom 
+                    variant="h6" 
+                    component="div"
+                    sx={{ 
+                      fontFamily: 'cursive', 
+                      fontWeight: 'bold',
+                      fontSize: '0.95rem',
+                      mb: 0.25,
+                      lineHeight: 1.2
+                    }}
+                  >
+                    {product.name}
+                  </Typography>
+                  <Typography 
+                    variant="body2" 
+                    color="text.secondary"
+                    sx={{ 
+                      fontFamily: 'cursive',
+                      fontSize: '0.8rem',
+                      mb: 0.5
+                    }}
+                  >
+                    {product.brand}
+                  </Typography>
+                  <Divider sx={{ my: 0.5 }} />
+                  
+                  {/* Variant Selection */}
+                  <FormControl fullWidth size="small" sx={{ mt: 0.5 }}>
+                    <InputLabel sx={{ fontFamily: 'cursive', fontSize: '0.85rem' }}>Size</InputLabel>
+                    <Select
+                      value={selectedVariants[product._id] || ''}
+                      onChange={(e) => handleVariantChange(product._id, e.target.value)}
+                      sx={{ 
+                        fontFamily: 'cursive',
+                        fontSize: '0.85rem',
+                        '.MuiSelect-select': { 
+                          py: 0.75
+                        }
+                      }}
+                    >
+                      {product.variants.map((variant, index) => (
+                        <MenuItem 
+                          key={index} 
+                          value={variant}
+                          sx={{ 
+                            fontFamily: 'cursive',
+                            fontSize: '0.85rem'
+                          }}
+                        >
+                          {variant.quantity} {variant.unit} - ₹{variant.price}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+
+                  {/* Stock Status */}
+                  {selectedVariants[product._id] && (
+                    <Typography 
+                      variant="body2" 
+                      sx={{ 
+                        mt: 0.75,
+                        fontFamily: 'cursive',
+                        fontSize: '0.7rem',
+                        color: selectedVariants[product._id].stock > 0 ? 'success.main' : 'error.main'
+                      }}
+                    >
+                      {selectedVariants[product._id].stock > 0 
+                        ? `In Stock (${selectedVariants[product._id].stock})` 
+                        : 'Out of Stock'}
+                    </Typography>
+                  )}
+                </CardContent>
+                <CardActions sx={{ p: 1.25, pt: 0.5 }}>
+                  <Button 
+                    fullWidth 
+                    variant="contained"
+                    size="small"
+                    disabled={!selectedVariants[product._id] || selectedVariants[product._id].stock === 0}
+                    sx={{
+                      bgcolor: '#90EE90',
+                      color: 'black',
+                      fontFamily: 'cursive',
+                      fontSize: '0.8rem',
+                      py: 0.5,
+                      '&:hover': {
+                        bgcolor: '#7BC47F',
+                      },
+                      '&.Mui-disabled': {
+                        bgcolor: '#E0E0E0',
+                      }
+                    }}
+                  >
+                    Add to Cart
+                  </Button>
+                </CardActions>
+              </Card>
+            </Grid>
           ))}
-        </Box>
+        </Grid>
+
+        {/* No Products Found */}
+        {filteredAndSortedProducts.length === 0 && (
+          <Box sx={{ textAlign: 'center', mt: 3 }}>
+            <Typography 
+              variant="h6" 
+              sx={{ 
+                fontFamily: 'cursive',
+                color: 'text.secondary' 
+              }}
+            >
+              No products found
+            </Typography>
+          </Box>
+        )}
       </Container>
     </Box>
   );
