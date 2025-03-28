@@ -29,15 +29,19 @@ import {
   Avatar,
   Alert,
   Snackbar,
+  Collapse,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import SearchIcon from '@mui/icons-material/Search';
 import CloseIcon from '@mui/icons-material/Close';
+import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
+import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import AdminNavbar from '../../components/admin/AdminNavbar';
 import { getAllProducts, createProduct, updateProduct, deleteProduct, updateStock } from '../../services/productService';
 import { useAuth } from '../../contexts/AuthContext';
+import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 
 const AdminHomePage = () => {
   const { token } = useAuth();
@@ -51,7 +55,7 @@ const AdminHomePage = () => {
   const [categories, setCategories] = useState(['Milk', 'Dairy', 'Ice Cream', 'Yoghurt', 'Butter', 'Cream', 'Cheese', 'Other']);
   const [brands, setBrands] = useState(['AMUL', 'Mother Dairy', 'Nestle', 'Britannia', 'Parag', 'Gokul', 'Govardhan']);
   const [selectedImage, setSelectedImage] = useState(null);
-  const [imagePreview, setImagePreview] = useState(null);
+  const [imagePreview, setImagePreview] = useState('');
   const [stockAdjustment, setStockAdjustment] = useState({ type: 'add', amount: 0 });
   const [inventoryItems, setInventoryItems] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -61,13 +65,21 @@ const AdminHomePage = () => {
     name: '',
     brand: '',
     category: '',
-    price: '',
-    stock: '',
-    unit: '',
+    baseUnit: '',
+    variants: [],
     image: ''
   });
 
-  const units = ['Litre', 'Kg', 'Piece', 'Pack', 'Box'];
+  const units = ['ml', 'L', 'g', 'kg', 'piece', 'pack'];
+
+  const [currentVariant, setCurrentVariant] = useState({
+    quantity: '',
+    unit: '',
+    price: '',
+    stock: ''
+  });
+
+  const [expandedRows, setExpandedRows] = useState(new Set());
 
   useEffect(() => {
     fetchProducts();
@@ -131,12 +143,11 @@ const AdminHomePage = () => {
         name: '',
         brand: '',
         category: '',
-        price: '',
-        stock: '',
-        unit: '',
+        baseUnit: '',
+        variants: [],
         image: ''
       });
-      setImagePreview(null);
+      setImagePreview('');
     }
     setOpenDialog(true);
   };
@@ -148,12 +159,11 @@ const AdminHomePage = () => {
       name: '',
       brand: '',
       category: '',
-      price: '',
-      stock: '',
-      unit: '',
+      baseUnit: '',
+      variants: [],
       image: ''
     });
-    setImagePreview(null);
+    setImagePreview('');
   };
 
   const handleOpenCategoryDialog = () => {
@@ -188,12 +198,7 @@ const AdminHomePage = () => {
       setSelectedImage(file);
       const reader = new FileReader();
       reader.onloadend = () => {
-        const base64String = reader.result;
-        setImagePreview(base64String);
-        setFormData(prev => ({
-          ...prev,
-          image: base64String
-        }));
+        setImagePreview(reader.result);
       };
       reader.readAsDataURL(file);
     }
@@ -222,31 +227,55 @@ const AdminHomePage = () => {
     }));
   };
 
+  const handleVariantChange = (e) => {
+    const { name, value } = e.target;
+    setCurrentVariant(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const handleAddVariant = () => {
+    if (currentVariant.quantity && currentVariant.unit && currentVariant.price && currentVariant.stock) {
+      setFormData(prev => ({
+        ...prev,
+        variants: [...prev.variants, {
+          ...currentVariant,
+          quantity: Number(currentVariant.quantity),
+          price: Number(currentVariant.price),
+          stock: Number(currentVariant.stock)
+        }]
+      }));
+      setCurrentVariant({
+        quantity: '',
+        unit: '',
+        price: '',
+        stock: ''
+      });
+    }
+  };
+
+  const handleRemoveVariant = (index) => {
+    setFormData(prev => ({
+      ...prev,
+      variants: prev.variants.filter((_, i) => i !== index)
+    }));
+  };
+
   const handleSubmit = async () => {
     try {
       if (!formData.name?.trim() || !formData.brand?.trim() || !formData.category?.trim() || 
-          !formData.price || !formData.stock || !formData.unit || !formData.image) {
-        throw new Error('Please fill in all required fields');
+          !formData.variants.length || !selectedImage) {
+        throw new Error('Please fill in all required fields and add at least one variant');
       }
 
-      // Validate and format the data
       const productData = {
-        ...formData,
-        price: Number(formData.price),
-        stock: Number(formData.stock),
-        isActive: true,
-        createdAt: new Date().toISOString()
+        name: formData.name.trim(),
+        brand: formData.brand.trim(),
+        category: formData.category.trim(),
+        variants: formData.variants,
+        image: imagePreview // Use the base64 string directly
       };
-
-      // Add new brand to the list if it doesn't exist
-      if (productData.brand && !brands.includes(productData.brand)) {
-        setBrands(prev => [...prev, productData.brand]);
-      }
-
-      // Add new category to the list if it doesn't exist
-      if (productData.category && !categories.includes(productData.category)) {
-        setCategories(prev => [...prev, productData.category]);
-      }
 
       if (editingItem) {
         await updateProduct(editingItem._id, productData);
@@ -255,21 +284,33 @@ const AdminHomePage = () => {
         await createProduct(productData);
         setSuccessMessage('Product added successfully');
       }
+      
       fetchProducts();
       handleCloseDialog();
     } catch (error) {
       console.error('Error saving product:', error);
-      setError(error.response?.data?.message || error.message || 'Error saving product');
+      setError(error.message || 'Error saving product');
     }
   };
 
   const handleDelete = async (id) => {
     try {
-      await deleteProduct(id, token);
+      if (!token) {
+        setError('You must be logged in to delete products');
+        return;
+      }
+
+      // Show confirmation dialog
+      if (!window.confirm('Are you sure you want to delete this product?')) {
+        return;
+      }
+
+      await deleteProduct(id);
       setSuccessMessage('Product deleted successfully');
-      fetchProducts();
+      await fetchProducts(); // Refresh the product list
     } catch (error) {
-      setError(error.message || 'Error deleting product');
+      console.error('Delete error:', error);
+      setError(error.message || 'Error deleting product. Please try again.');
     }
   };
 
@@ -287,6 +328,18 @@ const AdminHomePage = () => {
     if (categories[selectedTab - 1] === categoryToDelete) {
       setSelectedTab(0);
     }
+  };
+
+  const handleRowExpand = (productId) => {
+    setExpandedRows(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(productId)) {
+        newSet.delete(productId);
+      } else {
+        newSet.add(productId);
+      }
+      return newSet;
+    });
   };
 
   return (
@@ -446,32 +499,23 @@ const AdminHomePage = () => {
           </Tabs>
         </Box>
 
-        {/* Inventory Table */}
-        <TableContainer
-          component={Paper}
-          sx={{
-            borderRadius: '16px',
-            overflow: 'hidden',
-            boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.1)',
-          }}
-        >
+        {/* Product Table */}
+        <TableContainer component={Paper} sx={{ mt: 3 }}>
           <Table>
             <TableHead>
               <TableRow sx={{ bgcolor: '#FFE4B5' }}>
+                <TableCell sx={{ width: '48px' }}>{/* For expand/collapse */}</TableCell>
                 <TableCell sx={{ fontFamily: 'cursive', fontWeight: 'bold' }}>Image</TableCell>
                 <TableCell sx={{ fontFamily: 'cursive', fontWeight: 'bold' }}>Name</TableCell>
                 <TableCell sx={{ fontFamily: 'cursive', fontWeight: 'bold' }}>Brand</TableCell>
                 <TableCell sx={{ fontFamily: 'cursive', fontWeight: 'bold' }}>Category</TableCell>
-                <TableCell sx={{ fontFamily: 'cursive', fontWeight: 'bold' }}>Price</TableCell>
-                <TableCell sx={{ fontFamily: 'cursive', fontWeight: 'bold' }}>Stock</TableCell>
-                <TableCell sx={{ fontFamily: 'cursive', fontWeight: 'bold' }}>Unit</TableCell>
                 <TableCell sx={{ fontFamily: 'cursive', fontWeight: 'bold' }}>Actions</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={8} align="center" sx={{ py: 4 }}>
+                  <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
                     <Typography variant="h6" sx={{ fontFamily: 'cursive', color: 'text.secondary' }}>
                       Loading...
                     </Typography>
@@ -479,7 +523,7 @@ const AdminHomePage = () => {
                 </TableRow>
               ) : (selectedTab === 0 ? filteredItems : itemsByCategory[categories[selectedTab - 1]] || []).length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} align="center" sx={{ py: 4 }}>
+                  <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
                     <Typography variant="h6" sx={{ fontFamily: 'cursive', color: 'text.secondary' }}>
                       Inventory is empty. Please add products.
                     </Typography>
@@ -487,35 +531,75 @@ const AdminHomePage = () => {
                 </TableRow>
               ) : (
                 (selectedTab === 0 ? filteredItems : itemsByCategory[categories[selectedTab - 1]] || []).map((item) => (
-                  <TableRow key={item._id} sx={{ '&:hover': { bgcolor: '#f5f5f5' } }}>
-                    <TableCell>
-                      <Avatar
-                        src={item.image}
-                        alt={item.name}
-                        sx={{ width: 40, height: 40, borderRadius: '8px' }}
-                      />
-                    </TableCell>
-                    <TableCell sx={{ fontFamily: 'cursive' }}>{item.name}</TableCell>
-                    <TableCell sx={{ fontFamily: 'cursive' }}>{item.brand}</TableCell>
-                    <TableCell sx={{ fontFamily: 'cursive' }}>{item.category}</TableCell>
-                    <TableCell sx={{ fontFamily: 'cursive' }}>₹{item.price}</TableCell>
-                    <TableCell sx={{ fontFamily: 'cursive' }}>{item.stock}</TableCell>
-                    <TableCell sx={{ fontFamily: 'cursive' }}>{item.unit}</TableCell>
-                    <TableCell>
-                      <IconButton
-                        onClick={() => handleOpenDialog(item)}
-                        sx={{ color: 'primary.main' }}
-                      >
-                        <EditIcon />
-                      </IconButton>
-                      <IconButton
-                        onClick={() => handleDelete(item._id)}
-                        sx={{ color: 'error.main' }}
-                      >
-                        <DeleteIcon />
-                      </IconButton>
-                    </TableCell>
-                  </TableRow>
+                  <React.Fragment key={item._id}>
+                    <TableRow>
+                      <TableCell sx={{ width: '48px' }}>
+                        <IconButton
+                          size="small"
+                          onClick={() => handleRowExpand(item._id)}
+                        >
+                          {expandedRows.has(item._id) ? <KeyboardArrowUpIcon /> : <KeyboardArrowDownIcon />}
+                        </IconButton>
+                      </TableCell>
+                      <TableCell>
+                        <Avatar
+                          src={item.image}
+                          alt={item.name}
+                          sx={{ width: 40, height: 40, borderRadius: '8px' }}
+                        />
+                      </TableCell>
+                      <TableCell sx={{ fontFamily: 'cursive' }}>{item.name}</TableCell>
+                      <TableCell sx={{ fontFamily: 'cursive' }}>{item.brand}</TableCell>
+                      <TableCell sx={{ fontFamily: 'cursive' }}>{item.category}</TableCell>
+                      <TableCell>
+                        <IconButton
+                          size="small"
+                          onClick={() => handleOpenDialog(item)}
+                          sx={{ color: 'primary.main' }}
+                        >
+                          <EditIcon />
+                        </IconButton>
+                        <IconButton
+                          size="small"
+                          onClick={() => handleDelete(item._id)}
+                          sx={{ color: 'error.main' }}
+                        >
+                          <DeleteIcon />
+                        </IconButton>
+                      </TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell style={{ paddingBottom: 0, paddingTop: 0 }} colSpan={6}>
+                        <Collapse in={expandedRows.has(item._id)} timeout="auto" unmountOnExit>
+                          <Box sx={{ margin: 1 }}>
+                            <Typography variant="h6" gutterBottom component="div" sx={{ fontFamily: 'cursive' }}>
+                              Variants
+                            </Typography>
+                            <Table size="small">
+                              <TableHead>
+                                <TableRow>
+                                  <TableCell>Quantity</TableCell>
+                                  <TableCell>Unit</TableCell>
+                                  <TableCell>Price</TableCell>
+                                  <TableCell>Stock</TableCell>
+                                </TableRow>
+                              </TableHead>
+                              <TableBody>
+                                {item.variants.map((variant, index) => (
+                                  <TableRow key={index}>
+                                    <TableCell>{variant.quantity}</TableCell>
+                                    <TableCell>{variant.unit}</TableCell>
+                                    <TableCell>₹{variant.price}</TableCell>
+                                    <TableCell>{variant.stock}</TableCell>
+                                  </TableRow>
+                                ))}
+                              </TableBody>
+                            </Table>
+                          </Box>
+                        </Collapse>
+                      </TableCell>
+                    </TableRow>
+                  </React.Fragment>
                 ))
               )}
             </TableBody>
@@ -527,19 +611,13 @@ const AdminHomePage = () => {
       <Dialog 
         open={openDialog} 
         onClose={handleCloseDialog} 
-        maxWidth="sm" 
+        maxWidth="md" 
         fullWidth
-        PaperProps={{
-          sx: {
-            maxHeight: '90vh',
-            overflowY: 'auto'
-          }
-        }}
       >
-        <DialogTitle sx={{ fontFamily: 'cursive', pb: 1 }}>
+        <DialogTitle sx={{ fontFamily: 'cursive' }}>
           {editingItem ? 'Edit Product' : 'Add New Product'}
         </DialogTitle>
-        <DialogContent sx={{ pb: 2 }}>
+        <DialogContent>
           <Box sx={{ mt: 2 }}>
             <TextField
               fullWidth
@@ -593,126 +671,12 @@ const AdminHomePage = () => {
               )}
             />
 
-            <Autocomplete
-              freeSolo
-              options={categories}
-              value={formData.category}
-              onChange={(event, newValue) => {
-                setFormData(prev => ({
-                  ...prev,
-                  category: newValue || ''
-                }));
-              }}
-              onInputChange={(event, newInputValue) => {
-                setFormData(prev => ({
-                  ...prev,
-                  category: newInputValue
-                }));
-              }}
-              renderInput={(params) => (
-                <TextField
-                  {...params}
-                  label="Category"
-                  margin="normal"
-                  fullWidth
-                  sx={{ 
-                    mb: 2,
-                    '& .MuiInputLabel-root': {
-                      fontFamily: 'cursive'
-                    },
-                    '& .MuiOutlinedInput-root': {
-                      fontFamily: 'cursive'
-                    }
-                  }}
-                />
-              )}
-            />
-
-            <TextField
-              margin="normal"
-              fullWidth
-              label="Price"
-              name="price"
-              type="number"
-              value={formData.price}
-              onChange={handleInputChange}
-              inputProps={{ min: 0, step: 0.01 }}
-              sx={{ 
-                mb: 2,
-                '& .MuiInputLabel-root': {
-                  fontFamily: 'cursive'
-                },
-                '& .MuiOutlinedInput-root': {
-                  fontFamily: 'cursive'
-                }
-              }}
-            />
-
-            {/* Stock Section */}
-            {editingItem ? (
-              <Box sx={{ mb: 3 }}>
-                <Typography variant="subtitle1" sx={{ mb: 1, fontFamily: 'cursive' }}>
-                  Current Stock: {editingItem.stock}
-                </Typography>
-                <Box sx={{ display: 'flex', gap: 2, alignItems: 'flex-start' }}>
-                  <FormControl sx={{ minWidth: 120 }}>
-                    <InputLabel sx={{ fontFamily: 'cursive' }}>Action</InputLabel>
-                    <Select
-                      name="stockAdjustmentType"
-                      value={stockAdjustment.type}
-                      onChange={handleStockAdjustment}
-                      sx={{ fontFamily: 'cursive' }}
-                    >
-                      <MenuItem value="add">Add</MenuItem>
-                      <MenuItem value="subtract">Subtract</MenuItem>
-                    </Select>
-                  </FormControl>
-                  <TextField
-                    name="stockAdjustmentAmount"
-                    label="Amount"
-                    type="number"
-                    value={stockAdjustment.amount}
-                    onChange={handleStockAdjustment}
-                    inputProps={{ min: 0 }}
-                    sx={{
-                      '& .MuiInputLabel-root': {
-                        fontFamily: 'cursive'
-                      },
-                      '& .MuiOutlinedInput-root': {
-                        fontFamily: 'cursive'
-                      }
-                    }}
-                  />
-                </Box>
-              </Box>
-            ) : (
-              <TextField
-                margin="normal"
-                fullWidth
-                label="Initial Stock"
-                name="stock"
-                type="number"
-                value={formData.stock}
-                onChange={handleInputChange}
-                inputProps={{ min: 0 }}
-                sx={{ 
-                  mb: 3,
-                  '& .MuiInputLabel-root': {
-                    fontFamily: 'cursive'
-                  },
-                  '& .MuiOutlinedInput-root': {
-                    fontFamily: 'cursive'
-                  }
-                }}
-              />
-            )}
-
-            {/* Unit Selection */}
+            {/* Category Selection */}
             <FormControl fullWidth sx={{ mb: 3 }}>
-              <InputLabel sx={{ fontFamily: 'cursive' }}>Unit</InputLabel>
+              <InputLabel sx={{ fontFamily: 'cursive' }}>Category</InputLabel>
               <Select
-                name="unit"
-                value={formData.unit}
+                name="category"
+                value={formData.category}
                 onChange={handleInputChange}
                 sx={{ 
                   fontFamily: 'cursive',
@@ -721,14 +685,125 @@ const AdminHomePage = () => {
                   },
                 }}
               >
-                {units.map((unit) => (
-                  <MenuItem key={unit} value={unit}>{unit}</MenuItem>
+                {categories.map((category) => (
+                  <MenuItem key={category} value={category}>{category}</MenuItem>
                 ))}
               </Select>
             </FormControl>
 
-            {/* Image Upload */}
+            {/* Variants Section */}
             <Box sx={{ mb: 3 }}>
+              <Typography variant="h6" sx={{ mb: 2, fontFamily: 'cursive' }}>
+                Product Variants
+              </Typography>
+
+              {/* Add New Variant */}
+              <Box sx={{ mb: 2, p: 2, bgcolor: '#f5f5f5', borderRadius: 1 }}>
+                <Typography variant="subtitle1" sx={{ mb: 2, fontFamily: 'cursive' }}>
+                  Add New Variant
+                </Typography>
+                <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
+                  <TextField
+                    label="Quantity"
+                    name="quantity"
+                    type="number"
+                    value={currentVariant.quantity}
+                    onChange={handleVariantChange}
+                    sx={{ flex: 1 }}
+                    inputProps={{ min: 0 }}
+                  />
+                  <FormControl sx={{ flex: 1 }}>
+                    <InputLabel>Unit</InputLabel>
+                    <Select
+                      name="unit"
+                      value={currentVariant.unit}
+                      onChange={handleVariantChange}
+                    >
+                      {units.map((unit) => (
+                        <MenuItem key={unit} value={unit}>{unit}</MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                </Box>
+                <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
+                  <TextField
+                    label="Price"
+                    name="price"
+                    type="number"
+                    value={currentVariant.price}
+                    onChange={handleVariantChange}
+                    sx={{ flex: 1 }}
+                    inputProps={{ min: 0 }}
+                  />
+                  <TextField
+                    label="Stock"
+                    name="stock"
+                    type="number"
+                    value={currentVariant.stock}
+                    onChange={handleVariantChange}
+                    sx={{ flex: 1 }}
+                    inputProps={{ min: 0 }}
+                  />
+                </Box>
+                <Button
+                  variant="contained"
+                  onClick={handleAddVariant}
+                  disabled={!currentVariant.quantity || !currentVariant.unit || !currentVariant.price || !currentVariant.stock}
+                  sx={{
+                    bgcolor: '#90EE90',
+                    color: 'black',
+                    '&:hover': { bgcolor: '#7BC47F' },
+                    '&.Mui-disabled': { bgcolor: '#E0E0E0' }
+                  }}
+                >
+                  Add Variant
+                </Button>
+              </Box>
+
+              {/* Variants List */}
+              {formData.variants.length > 0 && (
+                <Box sx={{ mt: 2 }}>
+                  <Typography variant="subtitle1" sx={{ mb: 1, fontFamily: 'cursive' }}>
+                    Current Variants
+                  </Typography>
+                  <TableContainer component={Paper}>
+                    <Table size="small">
+                      <TableHead>
+                        <TableRow>
+                          <TableCell>Quantity</TableCell>
+                          <TableCell>Unit</TableCell>
+                          <TableCell>Price</TableCell>
+                          <TableCell>Stock</TableCell>
+                          <TableCell>Action</TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {formData.variants.map((variant, index) => (
+                          <TableRow key={index}>
+                            <TableCell>{variant.quantity}</TableCell>
+                            <TableCell>{variant.unit}</TableCell>
+                            <TableCell>₹{variant.price}</TableCell>
+                            <TableCell>{variant.stock}</TableCell>
+                            <TableCell>
+                              <IconButton
+                                size="small"
+                                onClick={() => handleRemoveVariant(index)}
+                                sx={{ color: 'error.main' }}
+                              >
+                                <DeleteIcon />
+                              </IconButton>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+                </Box>
+              )}
+            </Box>
+
+            {/* Image Upload */}
+            <Box sx={{ mt: 2, mb: 2 }}>
               <input
                 type="file"
                 accept="image/*"
@@ -738,12 +813,10 @@ const AdminHomePage = () => {
               />
               <label htmlFor="image-upload">
                 <Button
-                  component="span"
                   variant="outlined"
-                  sx={{
-                    fontFamily: 'cursive',
-                    mb: 2
-                  }}
+                  component="span"
+                  startIcon={<CloudUploadIcon />}
+                  sx={{ mb: 2 }}
                 >
                   Upload Image
                 </Button>
@@ -754,7 +827,7 @@ const AdminHomePage = () => {
                     src={imagePreview}
                     alt="Preview"
                     style={{
-                      maxWidth: '100%',
+                      maxWidth: '200px',
                       maxHeight: '200px',
                       objectFit: 'contain'
                     }}
@@ -786,10 +859,8 @@ const AdminHomePage = () => {
               !formData.name?.trim() ||
               !formData.brand?.trim() ||
               !formData.category?.trim() ||
-              !formData.price ||
-              !formData.stock ||
-              !formData.unit ||
-              !formData.image
+              !formData.variants.length ||
+              !selectedImage
             }
             sx={{
               bgcolor: '#90EE90',

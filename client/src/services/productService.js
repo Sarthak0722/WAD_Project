@@ -1,112 +1,121 @@
 import axios from 'axios';
 
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+const API_URL = 'http://localhost:5000/api/products';
 
-// Create axios instance with default config
-const api = axios.create({
-  baseURL: API_URL,
-  withCredentials: true,
-});
-
-// Add token to requests if it exists
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('token');
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
-});
-
-// Get all products (public)
+// Get all products
 export const getProducts = async () => {
   try {
-    const response = await api.get('/products');
+    const response = await axios.get(API_URL);
     return response.data;
   } catch (error) {
-    throw error.response?.data || { message: 'Error fetching products' };
+    throw error.response?.data || { message: error.message };
   }
 };
 
-// Get all products (admin only)
-export const getAllProducts = async (token) => {
+// Get all products (admin)
+export const getAllProducts = async () => {
   try {
-    const response = await api.get('/products/admin/all');
+    const token = localStorage.getItem('token');
+    const response = await axios.get(`${API_URL}/admin/all`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
     return response.data;
   } catch (error) {
-    throw error.response?.data || { message: 'Error fetching products' };
+    throw error.response?.data || { message: error.message };
   }
 };
 
 // Get single product
 export const getProduct = async (id) => {
   try {
-    const response = await api.get(`/products/${id}`);
+    const response = await axios.get(`${API_URL}/${id}`);
     return response.data;
   } catch (error) {
-    throw error.response?.data || { message: 'Error fetching product' };
+    throw error.response?.data || { message: error.message };
   }
 };
 
-// Create product (admin only)
+// Create product (admin)
 export const createProduct = async (productData) => {
   try {
-    // Ensure all required fields are present
-    const requiredFields = ['name', 'brand', 'category', 'price', 'stock', 'unit', 'image'];
-    const missingFields = requiredFields.filter(field => !productData[field]);
+    const token = localStorage.getItem('token');
     
-    if (missingFields.length > 0) {
-      throw new Error(`Missing required fields: ${missingFields.join(', ')}`);
+    // Ensure image is a string (base64)
+    if (!productData.image || typeof productData.image !== 'string') {
+      throw new Error('Please provide a valid image');
     }
 
-    // Validate image data
-    if (!productData.image.startsWith('data:image')) {
-      throw new Error('Invalid image format. Please upload a valid image.');
-    }
-
-    const response = await api.post('/products', productData);
+    const response = await axios.post(API_URL, productData, {
+      headers: { 
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    });
     return response.data;
   } catch (error) {
-    if (error.response?.data) {
-      throw error.response.data;
-    }
-    throw { message: error.message || 'Error creating product' };
+    console.error('Create Product Error:', error.response?.data || error);
+    throw error.response?.data || { message: error.message };
   }
 };
 
-// Update product (admin only)
+// Update product (admin)
 export const updateProduct = async (id, productData) => {
   try {
-    // Validate image data if it's being updated
-    if (productData.image && !productData.image.startsWith('data:image')) {
-      throw new Error('Invalid image format. Please upload a valid image.');
+    const token = localStorage.getItem('token');
+
+    // Ensure image is a string (base64) if provided
+    if (productData.image && typeof productData.image !== 'string') {
+      throw new Error('Please provide a valid image');
     }
 
-    const response = await api.put(`/products/${id}`, productData);
+    const response = await axios.put(`${API_URL}/${id}`, productData, {
+      headers: { 
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    });
     return response.data;
   } catch (error) {
-    if (error.response?.data) {
-      throw error.response.data;
-    }
-    throw { message: error.message || 'Error updating product' };
+    throw error.response?.data || { message: error.message };
   }
 };
 
-// Delete product (admin only)
-export const deleteProduct = async (id, token) => {
+// Delete product (admin)
+export const deleteProduct = async (id) => {
   try {
-    const response = await api.delete(`/products/${id}`);
+    const token = localStorage.getItem('token');
+    if (!token) {
+      throw new Error('No authentication token found');
+    }
+
+    const response = await axios.delete(`${API_URL}/${id}`, {
+      headers: { 
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    });
     return response.data;
   } catch (error) {
-    throw error.response?.data || { message: 'Error deleting product' };
+    console.error('Delete Product Error:', error.response?.data || error);
+    throw error.response?.data || { message: error.message || 'Failed to delete product' };
   }
 };
 
-// Update product stock (admin only)
-export const updateStock = async (id, stock, token) => {
-  try {
-    const response = await api.patch(`/products/${id}/stock`, { stock });
-    return response.data;
-  } catch (error) {
-    throw error.response?.data || { message: 'Error updating stock' };
-  }
+// Helper function to convert image file to base64
+const convertImageToBase64 = (file) => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = (error) => reject(error);
+  });
+};
+
+export default {
+  getProducts,
+  getAllProducts,
+  getProduct,
+  createProduct,
+  updateProduct,
+  deleteProduct
 }; 
