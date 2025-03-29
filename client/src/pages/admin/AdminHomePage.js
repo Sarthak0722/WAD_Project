@@ -466,34 +466,7 @@ const AdminHomePage = () => {
             {categories.map((category) => (
               <Tab 
                 key={category} 
-                label={
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                    {category}
-                    <span
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDeleteCategory(category);
-                      }}
-                      style={{
-                        cursor: 'pointer',
-                        color: 'rgba(0, 0, 0, 0.4)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        width: '16px',
-                        height: '16px',
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.color = 'rgba(0, 0, 0, 0.8)';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.color = 'rgba(0, 0, 0, 0.4)';
-                      }}
-                    >
-                      <CloseIcon sx={{ fontSize: '12px' }} />
-                    </span>
-                  </Box>
-                }
+                label={category}
               />
             ))}
           </Tabs>
