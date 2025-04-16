@@ -22,7 +22,12 @@ app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true }));
 
 // Mount routers
-app.use('/api/auth', require('./routes/authRoutes'));
+const authRoutes = require('./routes/authRoutes');
+const userRoutes = require('./routes/userRoutes');
+const subscriptionRoutes = require('./routes/subscriptionRoutes');
+app.use('/api/auth', authRoutes);
+app.use('/api/users', userRoutes);
+app.use('/api/subscription', subscriptionRoutes);
 app.use('/api/products', require('./routes/productRoutes'));
 
 // Error handling middleware

@@ -18,6 +18,7 @@ import Navbar from '../components/Navbar';
 import { useCart } from '../context/CartContext';
 import { useOrders } from '../context/OrderContext';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 
 const CartPage = () => {
   const {
@@ -29,7 +30,9 @@ const CartPage = () => {
     promoCode,
     cartTotal,
     clearCart,
+    hasSubscription
   } = useCart();
+  const { user } = useAuth();
   const { addOrder } = useOrders();
   const [promoInput, setPromoInput] = useState('');
   const navigate = useNavigate();
@@ -40,10 +43,16 @@ const CartPage = () => {
   };
 
   const handleProceedToPayment = () => {
+    // Check if user is subscribed or has subscription in cart
+    if (!user?.isSubscribed && !hasSubscription()) {
+      navigate('/subscription');
+      return;
+    }
+
     // Create a new order with properly formatted items
     const formattedItems = cartItems.map(item => ({
       id: item.id,
-      name: item.title, // Using title as name
+      name: item.title,
       quantity: item.quantity,
       price: item.price,
       image: item.image
@@ -87,12 +96,13 @@ const CartPage = () => {
               fontSize: '1.1rem'
             }}
           >
-            Looks like you haven't added anything to your cart yet.
-            Browse our exciting collection of dairy products!
+            {!user?.isSubscribed && !hasSubscription() 
+              ? "You need to subscribe to add products to your cart. Click below to subscribe."
+              : "Looks like you haven't added anything to your cart yet. Browse our exciting collection of dairy products!"}
           </Typography>
           <Button
             variant="contained"
-            onClick={() => navigate('/shop')}
+            onClick={() => navigate(!user?.isSubscribed && !hasSubscription() ? '/subscription' : '/shop')}
             sx={{
               bgcolor: '#b2ebf2',
               color: 'black',
@@ -107,7 +117,7 @@ const CartPage = () => {
               mt: 2
             }}
           >
-            Shop Now
+            {!user?.isSubscribed && !hasSubscription() ? 'Subscribe Now' : 'Shop Now'}
           </Button>
         </Container>
       </Box>
@@ -202,7 +212,7 @@ const CartPage = () => {
                 gridTemplateColumns: '2fr 1fr 1fr 1fr auto',
                 gap: 2,
                 alignItems: 'center',
-                bgcolor: '#b2ebf2',
+                bgcolor: item.id === 'subscription' ? '#FFE4B5' : '#b2ebf2',
                 borderRadius: '16px',
                 p: 3,
                 mb: 2,
@@ -227,22 +237,26 @@ const CartPage = () => {
                 {item.price} rs
               </Typography>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <IconButton
-                  onClick={() => updateQuantity(item.id, item.quantity - 1)}
-                  sx={{ bgcolor: '#f5f5f5' }}
-                >
-                  <RemoveIcon />
-                </IconButton>
-                <Typography sx={{ fontFamily: 'cursive', mx: 2 }}>
-                  {item.quantity}
-                </Typography>
-                <IconButton
-                  onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                  sx={{ bgcolor: '#f5f5f5' }}
-                >
-                  <AddIcon />
-                </IconButton>
-                <Typography sx={{ fontFamily: 'cursive', ml: 1 }}>ltr</Typography>
+                {item.id !== 'subscription' && (
+                  <>
+                    <IconButton
+                      onClick={() => updateQuantity(item.id, item.quantity - 1)}
+                      sx={{ bgcolor: '#f5f5f5' }}
+                    >
+                      <RemoveIcon />
+                    </IconButton>
+                    <Typography sx={{ fontFamily: 'cursive', mx: 2 }}>
+                      {item.quantity}
+                    </Typography>
+                    <IconButton
+                      onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                      sx={{ bgcolor: '#f5f5f5' }}
+                    >
+                      <AddIcon />
+                    </IconButton>
+                    <Typography sx={{ fontFamily: 'cursive', ml: 1 }}>ltr</Typography>
+                  </>
+                )}
               </Box>
               <Typography sx={{ fontFamily: 'cursive' }}>
                 {(item.price * item.quantity).toFixed(1)}
@@ -263,6 +277,12 @@ const CartPage = () => {
             <Typography sx={{ fontFamily: 'cursive' }}>Subtotal</Typography>
             <Typography sx={{ fontFamily: 'cursive' }}>{cartTotal.subtotal.toFixed(1)}</Typography>
           </Box>
+          {cartTotal.subscriptionTotal > 0 && (
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+              <Typography sx={{ fontFamily: 'cursive' }}>Subscription</Typography>
+              <Typography sx={{ fontFamily: 'cursive' }}>{cartTotal.subscriptionTotal.toFixed(1)}</Typography>
+            </Box>
+          )}
           <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
             <Typography sx={{ fontFamily: 'cursive' }}>Delivery charges</Typography>
             <Typography sx={{ fontFamily: 'cursive' }}>{cartTotal.deliveryCharges}</Typography>
@@ -287,7 +307,7 @@ const CartPage = () => {
             </Box>
           )}
           <Divider sx={{ my: 2 }} />
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
             <Typography sx={{ fontFamily: 'cursive', fontWeight: 'bold' }}>
               Total
             </Typography>

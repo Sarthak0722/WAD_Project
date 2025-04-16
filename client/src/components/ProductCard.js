@@ -1,13 +1,22 @@
 import React from 'react';
 import { Box, Typography, Button } from '@mui/material';
 import { useCart } from '../context/CartContext';
+import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 
 const ProductCard = ({ title, price, image }) => {
-  const { addToCart } = useCart();
+  const { addToCart, hasSubscription } = useCart();
+  const { user } = useAuth();
   const navigate = useNavigate();
 
   const handleAddToCart = () => {
+    // If user is not subscribed and doesn't have subscription in cart, redirect to subscription page
+    if (!user?.isSubscribed && !hasSubscription()) {
+      navigate('/subscription');
+      return;
+    }
+
+    // Add product to cart
     addToCart({ title, price: parseFloat(price), image });
     navigate('/cart');
   };

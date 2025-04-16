@@ -18,6 +18,14 @@ export const CartProvider = ({ children }) => {
 
   const addToCart = (product) => {
     setCartItems(prevItems => {
+      // Check if it's a subscription item
+      if (product.id === 'subscription') {
+        // Remove any existing subscription items
+        const filteredItems = prevItems.filter(item => item.id !== 'subscription');
+        return [...filteredItems, { ...product, quantity: 1 }];
+      }
+      
+      // For regular items
       const existingItem = prevItems.find(item => item.id === product.id);
       if (existingItem) {
         return prevItems.map(item =>
@@ -67,16 +75,37 @@ export const CartProvider = ({ children }) => {
     setDiscount(0);
   };
 
-  const subtotal = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+  const subtotal = cartItems.reduce((sum, item) => {
+    // Skip subscription items in subtotal calculation
+    if (item.id === 'subscription') return sum;
+    return sum + (item.price * item.quantity);
+  }, 0);
+
+  const subscriptionTotal = cartItems.reduce((sum, item) => {
+    // Only include subscription items
+    if (item.id === 'subscription') return sum + item.price;
+    return sum;
+  }, 0);
+
   const discountAmount = (subtotal * discount) / 100;
-  const grandTotal = subtotal + deliveryCharges - discountAmount;
+  const grandTotal = subtotal + subscriptionTotal + deliveryCharges - discountAmount;
 
   const cartTotal = {
     subtotal,
+    subscriptionTotal,
     deliveryCharges,
     discount: discountAmount,
-    total: subtotal + deliveryCharges - discountAmount,
-    itemCount: cartItems.reduce((sum, item) => sum + item.quantity, 0)
+    total: grandTotal,
+    itemCount: cartItems.reduce((sum, item) => {
+      // Don't count subscription items in item count
+      if (item.id === 'subscription') return sum;
+      return sum + item.quantity;
+    }, 0)
+  };
+
+  // Helper function to check if cart has subscription
+  const hasSubscription = () => {
+    return cartItems.some(item => item.id === 'subscription');
   };
 
   return (
@@ -91,7 +120,8 @@ export const CartProvider = ({ children }) => {
         applyPromoCode,
         removePromoCode,
         cartTotal,
-        deliveryCharges
+        deliveryCharges,
+        hasSubscription
       }}
     >
       {children}

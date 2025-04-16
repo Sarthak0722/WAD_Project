@@ -10,7 +10,10 @@ import {
   useMediaQuery,
   IconButton,
   Menu,
-  MenuItem
+  MenuItem,
+  ListItem,
+  ListItemIcon,
+  ListItemText
 } from '@mui/material';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import InventoryIcon from '@mui/icons-material/Inventory';
@@ -23,6 +26,7 @@ import MenuIcon from '@mui/icons-material/Menu';
 import SettingsIcon from '@mui/icons-material/Settings';
 import { useNavigate } from 'react-router-dom';
 import authService from '../../services/authService';
+import { Link } from 'react-router-dom';
 
 const AdminNavbar = () => {
   const theme = useTheme();

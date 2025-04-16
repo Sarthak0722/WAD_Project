@@ -10,6 +10,8 @@ import {
   Alert,
   Paper,
   Grid,
+  FormControlLabel,
+  Checkbox,
 } from '@mui/material';
 import { useFormik } from 'formik';
 import * as Yup from 'yup';
@@ -33,7 +35,7 @@ const validationSchema = Yup.object({
     .required('Password is required'),
   confirmPassword: Yup.string()
     .oneOf([Yup.ref('password'), null], 'Passwords must match')
-    .required('Confirm password is required'),
+    .required('Confirm password is required')
 });
 
 const RegisterPage = () => {
@@ -48,7 +50,7 @@ const RegisterPage = () => {
       phone: '',
       address: '',
       password: '',
-      confirmPassword: '',
+      confirmPassword: ''
     },
     validationSchema: validationSchema,
     onSubmit: async (values) => {

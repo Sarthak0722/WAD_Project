@@ -46,6 +46,12 @@ const userSchema = new mongoose.Schema(
       },
       default: 'customer'
     },
+    isSubscribed: {
+      type: Boolean,
+      default: false,
+      required: true,
+      description: 'Indicates whether the user has an active subscription (false by default, can only be true after purchase)'
+    },
     createdAt: {
       type: Date,
       default: Date.now

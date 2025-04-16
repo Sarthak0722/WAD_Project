@@ -13,7 +13,7 @@ const generateToken = (id) => {
 // @access  Public
 exports.register = async (req, res) => {
   try {
-    const { name, email, phone, address, password } = req.body;
+    const { name, email, phone, address, password, isSubscribed } = req.body;
 
     // Validate input
     if (!name || !email || !phone || !address || !password) {
@@ -40,6 +40,7 @@ exports.register = async (req, res) => {
       address,
       password,
       role: 'customer', // Default role for registration
+      isSubscribed: false // Always set to false for new registrations
     });
 
     // Generate token
@@ -54,6 +55,7 @@ exports.register = async (req, res) => {
         phone: user.phone,
         address: user.address,
         role: user.role,
+        isSubscribed: false // Always return false for new registrations
       },
       token,
     });
